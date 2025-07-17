@@ -1,16 +1,43 @@
 import requests
 import base64
 import os
-
-# Constants
+from PyPDF2 import PdfReader
 from dotenv import load_dotenv
 
-# Load environment variables from the .env file
 load_dotenv()
 
-# Access the tokens and URLs from environment variables
 SHOPIFY_API_TOKEN = os.getenv('SHOPIFY_API_TOKEN')
 SHOPIFY_API_URL = os.getenv('SHOPIFY_API_URL')
+
+def validate_document(file_path):
+    """Validate document against API limits."""
+    try:
+        file_size = os.path.getsize(file_path)
+        file_size_mb = file_size / (1024 * 1024)
+        
+        # Check file size (32MB limit)
+        if file_size > 32 * 1024 * 1024:
+            print(f"Error: File size {file_size_mb:.1f}MB exceeds 32MB limit")
+            return False
+        
+        # Use PyPDF2 to read the number of pages
+        with open(file_path, 'rb') as f:
+            reader = PdfReader(f)
+            num_pages = len(reader.pages)
+        
+        if num_pages > 100:
+            print(f"Error: Document has {num_pages} pages, exceeds 100-page limit")
+            return False
+        
+        print(f"Document validation passed: {file_size_mb:.1f}MB, {num_pages} pages")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File not found: {file_path}")
+        return False
+    except Exception as e:
+        print(f"Error validating document: {str(e)}")
+        return False
 
 def readable_response(response):
     print("=" * 80)
@@ -19,7 +46,6 @@ def readable_response(response):
     
     for item in response['content']:
         text = item.get('text', '')
-        # Output the text components directly
         print(text)
         
         # Check for any citations associated with this text
@@ -32,7 +58,8 @@ def readable_response(response):
             print(f"  [Cited from: {doc_title}, Pages: {start_page}-{end_page}]")
     
     print("\n" + "=" * 80)
-    # Print tokens usage for insight
+
+    # Token usage summary
     usage = response.get('usage', {})
     input_tokens = usage.get('input_tokens', 'NA')
     output_tokens = usage.get('output_tokens', 'NA')
@@ -41,9 +68,14 @@ def readable_response(response):
     print(f"  Output Tokens: {output_tokens}")
     print("=" * 80)
 
+# pdf_file_path = 'Shopify Annual Financial Report 2024.pdf'
+pdf_file_path = 'Pattern Recognition and Machine Learning Chapter 2.pdf'
+if not validate_document(pdf_file_path):
+    print("Exiting due to document validation failure.")
+    exit(1)
+
 # Load PDF as base64 for document upload
-# Replace with the actual path to your Shopify financial report
-with open('Pattern Recognition and Machine Learning Chapter 2.pdf', 'rb') as pdf_file:
+with open(pdf_file_path, 'rb') as pdf_file:
     pdf_content_base64 = base64.b64encode(pdf_file.read()).decode('utf-8')
 
 
@@ -67,7 +99,7 @@ while True:
     else:
         continue
 
-    # Define the payload for the request
+    # payload for the request
     payload = {
         "model": "claude-3-7-sonnet-20250219",
         "max_tokens": 1024,
@@ -101,10 +133,9 @@ while True:
         "Authorization": f"Bearer {SHOPIFY_API_TOKEN}"
     }
 
-    # Make the POST request
+    # Make the request
     response = requests.post(SHOPIFY_API_URL, json=payload, headers=headers)
 
-    # Check the response
     if response.status_code == 200:
         readable_response(response.json())
     else:
