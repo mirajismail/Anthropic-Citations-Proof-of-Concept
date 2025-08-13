@@ -12,7 +12,7 @@ Concurrent API calls to analyze multiple PDF documents with citations.
 
 2. **Install dependencies**
    ```bash
-   pip install requests PyPDF2 python-dotenv
+   pip install requests python-dotenv
    ```
 
 3. **Configure environment**
